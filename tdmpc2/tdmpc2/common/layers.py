@@ -91,11 +91,13 @@ class NormedLinear(nn.Linear):
 	Linear layer with LayerNorm, activation, and optionally dropout.
 	"""
 
-	def __init__(self, *args, dropout=0., act=None, **kwargs):
-		super().__init__(*args, **kwargs)
-		self.ln = nn.LayerNorm(self.out_features)
+	def __init__(self, in_features, out_features, bias=True, dropout=0., act=None):
+		super().__init__(in_features, out_features, bias=bias)
+		self.ln = nn.LayerNorm(out_features)
 		if act is None:
 			act = nn.Mish(inplace=False)
+		self.in_features = in_features
+		self.out_features = out_features
 		self.act = act
 		self.dropout = nn.Dropout(dropout, inplace=False) if dropout else None
 
@@ -113,16 +115,16 @@ class NormedLinear(nn.Linear):
 			f"act={self.act.__class__.__name__})"
 
 class MLP(nn.Module):
-	def __init__(self, in_dim, mlp_dims, out_dim, act=None, dropout=0.):
+	def __init__(self, input_dim, hidden_dims, output_dim, activation=None, dropout=0.):
 		super().__init__()
-		if isinstance(mlp_dims, int):
-			mlp_dims = [mlp_dims]
-		dims = [in_dim] + mlp_dims + [out_dim]
+		if isinstance(hidden_dims, int):
+			hidden_dims = [hidden_dims]
+		dims = [input_dim] + hidden_dims + [output_dim]
 		modules = []
 		for i in range(len(dims) - 2):
 			modules.append(NormedLinear(dims[i], dims[i+1], dropout=dropout*(i==0)))
-		if act is not None:
-			modules.append(NormedLinear(dims[-2], dims[-1], act=act))
+		if activation is not None:
+			modules.append(NormedLinear(dims[-2], dims[-1], act=activation))
 		else:
 			modules.append(nn.Linear(dims[-2], dims[-1]))
 		self.net = nn.Sequential(*modules)

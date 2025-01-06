@@ -27,7 +27,7 @@ class WorldModel(nn.Module):
 			if k == 'state':
 				enc_dict[k] = layers.MLP(
 					input_dim=cfg.obs_shape[k][0] + cfg.task_dim,
-					hidden_dims=[max(cfg.num_enc_layers-1, 1)*[cfg.enc_dim]],
+					hidden_dims=max(cfg.num_enc_layers-1, 1)*[cfg.enc_dim],
 					output_dim=cfg.latent_dim,
 					activation=layers.SimNorm(cfg)
 				)
@@ -65,8 +65,7 @@ class WorldModel(nn.Module):
 		])
 
 		self.apply(init.weight_init)
-		init.zero_([self._reward[-1].weight, self._Qs.params["2", "weight"]])
-
+		init.zero_([self._reward.net[-1].weight, self._Qs.params[1]['net']['0']['ln']['weight'], self._Qs.params[1]['net']['1']['ln']['weight']])
 		self.register_buffer("log_std_min", torch.tensor(cfg.log_std_min))
 		self.register_buffer("log_std_dif", torch.tensor(cfg.log_std_max) - self.log_std_min)
 		self.init()

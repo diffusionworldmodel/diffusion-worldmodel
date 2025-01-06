@@ -1,9 +1,10 @@
 import os
 # 環境変数の設定（MujocoのレンダリングやTorchのログ関連）
-os.environ['MUJOCO_GL'] = 'egl'
+os.environ['MUJOCO_GL'] = 'glfw'
 os.environ['LAZY_LEGACY_OP'] = '0'
 os.environ['TORCHDYNAMO_INLINE_INBUILT_NN_MODULES'] = "1"
 os.environ['TORCH_LOGS'] = "+recompiles"
+
 
 import warnings
 warnings.filterwarnings('ignore')  # 警告を非表示
@@ -23,7 +24,6 @@ from common.logger import Logger     # ログを管理するクラス
 
 torch.backends.cudnn.benchmark = True  # CNNでの高速化を有効化
 torch.set_float32_matmul_precision('high')  # 行列演算の精度を調整
-
 
 @hydra.main(config_name='config', config_path='.')
 def train(cfg: dict):
