@@ -10,9 +10,7 @@ def missing_dependencies(task):
 	raise ValueError(f'Missing dependencies for task {task}; install dependencies to use this environment.')
 
 from envs.dmcontrol import make_env as make_dm_control_env
-
 warnings.filterwarnings('ignore', category=DeprecationWarning)
-
 
 def make_multitask_env(cfg):
 	"""
@@ -33,7 +31,6 @@ def make_multitask_env(cfg):
 	cfg.action_dims = env._action_dims
 	cfg.episode_lengths = env._episode_lengths
 	return env
-	
 
 def make_env(cfg):
 	"""
