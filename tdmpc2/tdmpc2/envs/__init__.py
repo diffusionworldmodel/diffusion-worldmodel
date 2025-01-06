@@ -55,5 +55,7 @@ def make_env(cfg):
 	print('Observation shape: ', cfg.obs_shape)
 	print('Action Dim: ', cfg.action_dim)
 	cfg.episode_length = env.max_episode_steps
-	cfg.seed_steps = max(1000, 5*cfg.episode_length)
+	cfg.seed_steps = max(1000, 2*cfg.episode_length)
+	# cfg.seed_steps = max(1000, 5*cfg.episode_length)
+	print("Seed steps: ", cfg.seed_steps)
 	return env

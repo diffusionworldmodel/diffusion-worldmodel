@@ -7,8 +7,8 @@ obs: state
 
 # evaluation
 checkpoint: ???
-eval_episodes: 10
-eval_freq: 50000
+eval_episodes: 1
+eval_freq: 10000
 
 # training
 steps: 10_000_000

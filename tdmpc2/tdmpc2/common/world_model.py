@@ -17,8 +17,7 @@ class Config:
     dataset = 'hopper-medium-expert-v2'
 
     ## model
-    horizon = 100
-    n_diffusion_steps = 20 # 200
+    n_diffusion_steps = 5 # 200
     action_weight = 10
     loss_weights = None
     loss_discount = 1
@@ -223,7 +222,6 @@ class WorldModel(nn.Module):
 		return actions, latent_states
 		return [num_samples, horizon, action_dim], [num_samples, horizon, latent_dim]
 		"""
-		z = z.repeat(num_samples, 1) # [num_samples, latent_dim]
 		if self.dynamics_diffusion.returns_condition:
 			returns = torch.ones(num_samples, 1).to(z.device)
 		else:
