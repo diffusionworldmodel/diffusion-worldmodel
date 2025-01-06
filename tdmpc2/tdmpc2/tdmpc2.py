@@ -22,9 +22,10 @@ class TDMPC2(torch.nn.Module):
 			{'params': self.model._encoder.parameters(), 'lr': self.cfg.lr*self.cfg.enc_lr_scale},
 			{'params': self.model._reward.parameters()},
 			{'params': self.model._Qs.parameters()},
-			{'params': self.model._task_emb.parameters() if self.cfg.multitask else []}
+			{'params': self.model._task_emb.parameters() if self.cfg.multitask else []},
+			{'params': self.model.dynamics_diffusion.parameters()},
 		], lr=self.cfg.lr, capturable=True)
-		self.optimizer = torch.optim.Adam(self.model.dynamics_diffusion.parameters(), lr=self.cfg.lr)
+		# self.optimizer = torch.optim.Adam(self.model.dynamics_diffusion.parameters(), lr=self.cfg.lr)
 		self.pi_optim = torch.optim.Adam(self.model._pi.parameters(), lr=self.cfg.lr, eps=1e-5, capturable=True)
 		self.model.eval()
 		self.scale = RunningScale(cfg)
@@ -245,13 +246,9 @@ class TDMPC2(torch.nn.Module):
 
 		zs = zs.transpose(0, 1) # [horizon, batch_size, latent_dim]
 		# actions [horizon, batch_size, action_dim]
-		print("zs shape: ", zs.shape) # [16, 256, 512]
-		print("actions shape: ", actions.shape) # [16, 256, 6]
 		# 予測
 		qs = self.model.Q(zs, actions, task, return_type='all')
-		print("qs shape: ", qs.shape) # [5, 16, 256, 101]
 		reward_preds = self.model.reward(zs, actions, task)
-		print("reward_preds shape: ", reward_preds.shape) # [16, 256, 101]
 
 		# 損失を計算
 		reward_loss, value_loss = 0, 0
@@ -262,7 +259,15 @@ class TDMPC2(torch.nn.Module):
 
 		reward_loss = reward_loss / self.cfg.horizon
 		value_loss = value_loss / (self.cfg.horizon * self.cfg.num_q)
+
+		conditions = {0: z} # z [batch_size, latent_dim]
+		returns = torch.ones(self.cfg.batch_size, 1).to(z.device)
+		az = torch.cat([actions, z_list[:-1]], dim=-1)
+		az = az.transpose(0, 1) # az [horizon, batch_size, action_dim+latent_dim]->[batch_size, horizon, action_dim+latent_dim]
+		diffusion_loss, _ = self.model.dynamics_diffusion.loss(az, conditions, returns)
+
 		total_loss = (
+			self.cfg.diffusion_coef * diffusion_loss +
 			self.cfg.reward_coef * reward_loss +
 			self.cfg.value_coef * value_loss
 		)
@@ -280,16 +285,14 @@ class TDMPC2(torch.nn.Module):
 		self.model.soft_update_target_Q()
 
 		# diffusionの更新
-		conditions = {0: z}
-		returns = torch.ones(self.cfg.batch_size, 1).to(z.device)
-		az = torch.cat([actions, z_list[:-1]], dim=-1)
-		# az [horizon, batch_size, action_dim+latent_dim]->[batch_size, horizon, action_dim+latent_dim]
-		az = az.transpose(0, 1)
-		# z [batch_size, latent_dim]
-		diffusion_loss, _ = self.model.dynamics_diffusion.loss(az, conditions, returns)
-		diffusion_loss.backward()
-		self.optimizer.step()
-		self.optimizer.zero_grad()
+		# conditions = {0: z} # z [batch_size, latent_dim]
+		# returns = torch.ones(self.cfg.batch_size, 1).to(z.device)
+		# az = torch.cat([actions, z_list[:-1]], dim=-1)
+		# az = az.transpose(0, 1) # az [horizon, batch_size, action_dim+latent_dim]->[batch_size, horizon, action_dim+latent_dim]
+		# diffusion_loss, _ = self.model.dynamics_diffusion.loss(az, conditions, returns)
+		# diffusion_loss.backward()
+		# self.optimizer.step()
+		# self.optimizer.zero_grad()
 
 		# トレーニング統計を返す
 		self.model.eval()

@@ -17,7 +17,7 @@ class Config:
     dataset = 'hopper-medium-expert-v2'
 
     ## model
-    n_diffusion_steps = 5 # 200
+    n_diffusion_steps = 20 # 200
     action_weight = 10
     loss_weights = None
     loss_discount = 1
