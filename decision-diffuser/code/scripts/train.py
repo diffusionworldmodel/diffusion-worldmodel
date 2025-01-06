@@ -69,7 +69,7 @@ def main(**deps):
             device=Config.device,
         )
 
-        diffusion_config = utils.Config(
+        diffusion_config = utils.Config( # これ？
             Config.diffusion,
             savepath='diffusion_config.pkl',
             horizon=Config.horizon,

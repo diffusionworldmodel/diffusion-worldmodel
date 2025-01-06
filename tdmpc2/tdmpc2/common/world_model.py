@@ -3,9 +3,65 @@ from copy import deepcopy
 import torch
 import torch.nn as nn
 
-from common import layers, math, init
+from common import layers, math, init, temporal, diffusion
 from tensordict import TensorDict
 from tensordict.nn import TensorDictParams
+from dataclasses import dataclass
+
+@dataclass
+class Config:
+    # misc
+    seed = 100
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    bucket = '/home/aajay/weights/'
+    dataset = 'hopper-medium-expert-v2'
+
+    ## model
+    horizon = 100
+    n_diffusion_steps = 20 # 200
+    action_weight = 10
+    loss_weights = None
+    loss_discount = 1
+    predict_epsilon = True
+    dim_mults = (1, 4, 8)
+    returns_condition = True
+    calc_energy=False
+    dim=128
+    condition_dropout=0.25
+    condition_guidance_w = 1.2
+    test_ret=0.9
+    renderer = 'utils.MuJoCoRenderer'
+
+    ## dataset
+    loader = 'datasets.SequenceDataset'
+    normalizer = 'CDFNormalizer'
+    preprocess_fns = []
+    clip_denoised = True
+    use_padding = True
+    include_returns = True
+    discount = 0.99
+    max_path_length = 1000
+    hidden_dim = 256
+    ar_inv = False
+    train_only_inv = False
+    termination_penalty = -100
+    returns_scale = 400.0 # Determined using rewards from the dataset
+
+    ## training
+    n_steps_per_epoch = 10000
+    loss_type = 'l2'
+    n_train_steps = 1e6
+    batch_size = 32
+    learning_rate = 2e-4
+    gradient_accumulate_every = 2
+    ema_decay = 0.995
+    log_freq = 1000
+    save_freq = 10000
+    sample_freq = 10000
+    n_saves = 5
+    save_parallel = False
+    n_reference = 8
+    save_checkpoints = False
 
 class WorldModel(nn.Module):
 	"""
@@ -36,12 +92,32 @@ class WorldModel(nn.Module):
 			else:
 				raise ValueError(f"Unknown observation type: {k}")
 		self._encoder = nn.ModuleDict(enc_dict)
-		# Dynamics
-		self._dynamics = layers.MLP(
-			input_dim=cfg.latent_dim + cfg.action_dim + cfg.task_dim,
-			hidden_dims=[cfg.mlp_dim, cfg.mlp_dim],
-			output_dim=cfg.latent_dim,
-			activation=layers.SimNorm(cfg)
+		# DynamicsDiffusion設定
+		unet_model = temporal.TemporalUnet(
+			horizon=cfg.horizon, # Config.horizon,
+			transition_dim=cfg.latent_dim + cfg.action_dim,
+			cond_dim=cfg.latent_dim,
+			dim_mults=Config.dim_mults,
+			returns_condition=Config.returns_condition,
+			dim=Config.dim,
+			condition_dropout=Config.condition_dropout,
+			calc_energy=Config.calc_energy,
+		)
+		self.dynamics_diffusion = diffusion.GaussianDiffusion(
+			model=unet_model,
+			horizon=cfg.horizon, # Config.horizon,
+			observation_dim=cfg.latent_dim,
+			action_dim=cfg.action_dim,
+			n_timesteps=Config.n_diffusion_steps,
+			loss_type=Config.loss_type,
+			clip_denoised=Config.clip_denoised,
+			predict_epsilon=Config.predict_epsilon,
+			## loss weighting
+			action_weight=Config.action_weight,
+			loss_weights=Config.loss_weights,
+			loss_discount=Config.loss_discount,
+			returns_condition=Config.returns_condition,
+			condition_guidance_w=Config.condition_guidance_w,
 		)
 		# Reward, policy prior, Q-functions
 		self._reward = layers.MLP(
@@ -86,8 +162,8 @@ class WorldModel(nn.Module):
 
 	def __repr__(self):
 		repr = 'TD-MPC2 World Model\n'
-		modules = ['Encoder', 'Dynamics', 'Reward', 'Policy prior', 'Q-functions']
-		for i, m in enumerate([self._encoder, self._dynamics, self._reward, self._pi, self._Qs]):
+		modules = ['Encoder', 'Reward', 'Policy prior', 'Q-functions']
+		for i, m in enumerate([self._encoder, self._reward, self._pi, self._Qs]):
 			repr += f"{modules[i]}: {m}\n"
 		repr += "Learnable parameters: {:,}".format(self.total_params)
 		return repr
@@ -141,14 +217,23 @@ class WorldModel(nn.Module):
 			return torch.stack([self._encoder[self.cfg.obs](o) for o in obs])
 		return self._encoder[self.cfg.obs](obs)
 
-	def next(self, z, a, task):
+	def generate_trajectory(self, z, num_samples):
 		"""
-		Predicts the next latent state given the current latent state and action.
+		zとaの結合から軌道を生成する。
+		return actions, latent_states
+		return [num_samples, horizon, action_dim], [num_samples, horizon, latent_dim]
 		"""
-		if self.cfg.multitask:
-			z = self.task_emb(z, task)
-		z = torch.cat([z, a], dim=-1)
-		return self._dynamics(z)
+		z = z.repeat(num_samples, 1) # [num_samples, latent_dim]
+		if self.dynamics_diffusion.returns_condition:
+			returns = torch.ones(num_samples, 1).to(z.device)
+		else:
+			returns = None
+		conditions = {0: z}
+		if self.dynamics_diffusion.model.calc_energy:
+			samples = self.dynamics_diffusion.grad_conditional_sample(conditions, returns=returns)
+		else: # こっち
+			samples = self.dynamics_diffusion.conditional_sample(conditions, returns=returns)
+		return samples[:, :, :self.cfg.action_dim], samples[:, :, self.cfg.action_dim:]
 
 	def reward(self, z, a, task):
 		"""
