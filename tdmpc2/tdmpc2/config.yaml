@@ -2,7 +2,7 @@ defaults:
     - override hydra/launcher: submitit_local
 
 # environment
-task: cheetah-run # humanoid-walk # genesis
+task: pendulum-spin # cheetah-run # humanoid-walk # genesis
 obs: state
 
 # evaluation
