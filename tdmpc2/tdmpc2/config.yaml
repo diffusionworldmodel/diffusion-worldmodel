@@ -7,8 +7,8 @@ obs: state
 
 # evaluation
 checkpoint: ???
-eval_episodes: 10
-eval_freq: 50000
+eval_episodes: 1
+eval_freq: 5000
 
 # training
 steps: 10_000_000
@@ -31,10 +31,10 @@ data_dir: ???
 # planning
 mpc: true
 iterations: 6
-num_samples: 512
-num_elites: 64
+num_samples: 64
+num_elites: 16
 num_pi_trajs: 24
-horizon: 3
+horizon: 8
 min_std: 0.05
 max_std: 2
 temperature: 0.5
