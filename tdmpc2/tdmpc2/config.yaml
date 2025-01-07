@@ -12,10 +12,10 @@ eval_freq: 10000
 
 # training
 steps: 10_000_000
-batch_size: 512 # 256
+batch_size: 256
 reward_coef: 0.1
 value_coef: 0.1
-diffusion_coef: 0.1
+diffusion_coef: 0.005
 rho: 0.5
 lr: 3e-4
 enc_lr_scale: 0.3
@@ -31,10 +31,10 @@ data_dir: ???
 # planning
 mpc: true
 iterations: 6
-num_samples: 512
-num_elites: 64
+num_samples: 64 # 512
+num_elites: 16 # 64
 num_pi_trajs: 24
-horizon: 16 # キリの良い値にしないとtemporal.pyのconvでずれる
+horizon: 8 # 16 キリの良い値にしないとtemporal.pyのconvでずれる
 min_std: 0.05
 max_std: 2
 temperature: 0.5

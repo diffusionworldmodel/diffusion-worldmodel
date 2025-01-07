@@ -55,11 +55,13 @@ class OnlineTrainer(Trainer):
 			obs = obs.unsqueeze(0).cpu()
 		if action is None:
 			action = torch.full_like(self.env.rand_act(), float('nan'))
+		if action.dim() == 1:
+			action = action.unsqueeze(0)
 		if reward is None:
 			reward = torch.tensor(float('nan'))
 		td = TensorDict(
 			obs=obs,
-			action=action.unsqueeze(0),
+			action=action,
 			reward=reward.unsqueeze(0),
 		batch_size=(1,))
 		return td
@@ -87,7 +89,7 @@ class OnlineTrainer(Trainer):
 					)
 					train_metrics.update(self.common_metrics())
 					self.logger.log(train_metrics, 'train')
-					self._ep_idx = self.buffer.add(torch.cat(self._tds))
+					self._ep_idx = self.buffer.add(torch.cat(self._tds)) # ここでエラー
 
 				obs = self.env.reset()
 				self._tds = [self.to_td(obs)]
