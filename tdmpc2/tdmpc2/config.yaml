@@ -2,13 +2,13 @@ defaults:
     - override hydra/launcher: submitit_local
 
 # environment
-task: pendulum-spin # cheetah-run # humanoid-walk # genesis
+task: cheetah-run # pendulum-spin humanoid-walk # genesis
 obs: state
 
 # evaluation
 checkpoint: ???
 eval_episodes: 1
-eval_freq: 10000
+eval_freq: 5000
 
 # training
 steps: 10_000_000
